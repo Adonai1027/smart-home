@@ -4,7 +4,6 @@ from enum import Enum, auto
 from dataclasses import dataclass
 
 class TokenKind(Enum):
-    # Palabras reservadas
     WHEN = auto()
     EVERY = auto()
     IF = auto()
@@ -17,7 +16,6 @@ class TokenKind(Enum):
     OR = auto()
     NOT = auto()
     
-    # Literales booleanos
     TRUE = auto()
     FALSE = auto()
     ON = auto()
@@ -26,12 +24,10 @@ class TokenKind(Enum):
     MODO = auto() 
     COLOR = auto()
     
-    # Identificadores
     SENSOR = auto()       # sensor_temp, sensor_luz, etc.
     ACTUATOR = auto()     # foco_entrada, aire_acondicionado, etc.
     ATTRIBUTE = auto()    # .estado, .brillo, etc. (incluye el punto)
     
-    # Literales con unidad
     NUMBER = auto()       # 25, 80, 100, etc.
     TEMP = auto()         # 25°C
     PERCENT = auto()      # 80%
@@ -42,7 +38,6 @@ class TokenKind(Enum):
     STRING = auto()       # "texto"
     EMAIL = auto()        # alguien@dominio.com
     
-    # Operadores
     EQUAL    = auto()           # ==
     NEGATE = auto()          # !=
     GREATER = auto()     # >
@@ -51,11 +46,9 @@ class TokenKind(Enum):
     LESS_EQUAL = auto()       # <=
     ASSIGN = auto()          # =
     
-    # Símbolos
     LPAREN = auto() #(
     RPAREN = auto() #)
     
-    # Control
     EOF = auto()
     ERROR = auto()
     
@@ -168,16 +161,44 @@ class Lexer:
         start_row = self.row
         start_col = self.col
         lexema = ""
-        
-        # Leer mientras haya dígitos
+
         while self.pos < len(self.source) and self.peek().isdigit():
             lexema += self.advance()
-        
-        self.tokens.append(Token(
-            TokenKind.NUMBER,
-            lexema,
-            start_row, start_col
-        ))
+
+        if self.peek() == '.' and self.peek(1).isdigit():
+            lexema += self.advance()
+            while self.pos < len(self.source) and self.peek().isdigit():
+                lexema += self.advance()
+
+        sig = self.peek()
+
+        if sig == '%':
+            lexema += self.advance()
+            self.tokens.append(Token(TokenKind.PERCENT, lexema, start_row, start_col))
+
+        elif sig == '°' or (sig == 'C' and lexema):
+            if sig == '°':
+                lexema += self.advance()
+            if self.peek() == 'C':
+                lexema += self.advance()
+                self.tokens.append(Token(TokenKind.TEMP, lexema, start_row, start_col))
+            else:
+                self.errors.append(f"Unidad de temperatura incompleta: '{lexema}'")
+
+        elif sig in ('l', 's', 'm', 'h'):
+            if sig == 'l' and self.source[self.pos:self.pos+3] == 'lux':
+                lexema += self.advance()
+                lexema += self.advance()
+                lexema += self.advance()
+                self.tokens.append(Token(TokenKind.LUX, lexema, start_row, start_col))
+            elif sig in ('s', 'm', 'h'):
+                lexema += self.advance()
+                self.tokens.append(Token(TokenKind.TIME_DURATION, lexema, start_row, start_col))
+            else:
+                self.tokens.append(Token(TokenKind.NUMBER, lexema, start_row, start_col))
+
+        else:
+            self.tokens.append(Token(TokenKind.NUMBER, lexema, start_row, start_col))
 
 
     def consumir_comentario(self):
