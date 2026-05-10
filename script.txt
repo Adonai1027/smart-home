@@ -1,0 +1,13 @@
+every 36:88 do
+    if (altavoz_.mute = ON) then
+        aire_acondicionado.estado = ON
+
+        if sensor_humedad < 77% then
+            persiana_.posicion = 4%
+        else
+            altavoz_.mute = ON
+        end
+    end
+
+    foco_D.brillo = 3%
+end
