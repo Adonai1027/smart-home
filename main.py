@@ -61,7 +61,7 @@ class Token:
     col: int
     
     def __repr__(self):
-        return f"Token({self.kind.name}, '{self.src}', línea={self.row}, col={self.col})"
+        return f"\033[92mToken\033[0m(\033[93m{self.kind.name}\033[0m, \033[96m'{self.src}'\033[0m, línea={self.row}, col={self.col})"
 
 PALABRAS_RESERVADAS = {
     "when": TokenKind.WHEN,
@@ -98,6 +98,20 @@ class Lexer:
         self.col = 1
         self.tokens = []
         self.errors = []
+
+    def add_error(self, msg, row=None, col=None):
+        r = row if row is not None else self.row
+        c = col if col is not None else self.col
+        lines = self.source.split('\n')
+        line_idx = r - 1
+        if 0 <= line_idx < len(lines):
+            line_text = lines[line_idx]
+            err_msg = f"\033[91mError Léxico\033[0m en línea {r}, col {c}: {msg}\n"
+            err_msg += f"  {line_text}\n"
+            err_msg += "  " + " " * (c - 1) + "\033[91m^\033[0m"
+            self.errors.append(err_msg)
+        else:
+            self.errors.append(f"\033[91mError Léxico:\033[0m {msg}")
 
 
     def peek(self, offset=0):
@@ -150,7 +164,7 @@ class Lexer:
                 self.consumir_numero()
                 continue
             
-            self.errors.append(f"Carácter no reconocido: '{ch}'")
+            self.add_error(f"Carácter no reconocido: '{ch}'")
             self.advance()
         
         self.tokens.append(Token(TokenKind.EOF, "", self.row, self.col))
@@ -183,7 +197,7 @@ class Lexer:
                 lexema += self.advance()
                 self.tokens.append(Token(TokenKind.TEMP, lexema, start_row, start_col))
             else:
-                self.errors.append(f"Unidad de temperatura incompleta: '{lexema}'")
+                self.add_error(f"Unidad de temperatura incompleta: '{lexema}'")
 
         elif sig in ('l', 's', 'm', 'h'):
             if sig == 'l' and self.source[self.pos:self.pos+3] == 'lux':
@@ -243,7 +257,7 @@ class Lexer:
                 self.tokens.append(Token(TokenKind.ACTUATOR, lexema, start_row, start_col))
                 return
         
-        self.errors.append(f"Identificador no reconocido: '{lexema}' ")
+        self.add_error(f"Identificador no reconocido: '{lexema}' ")
 
 
     def consumir_atributo(self):
@@ -257,11 +271,11 @@ class Lexer:
             nombre += self.advance()
         
         if not nombre:
-            self.errors.append("Se esperaba un nombre de atributo después del '.'")
+            self.add_error("Se esperaba un nombre de atributo después del '.'")
             return
         
         if nombre.lower() not in ATRIBUTOS_VALIDOS:
-            self.errors.append(f"Atributo desconocido: '.{nombre}'")
+            self.add_error(f"Atributo desconocido: '.{nombre}'")
             return
         
         self.tokens.append(Token(
@@ -280,12 +294,12 @@ class Lexer:
         
         while self.pos < len(self.source) and self.peek() != '"':
             if self.peek() == '\n':
-                self.errors.append("Cadena sin cerrar antes del fin de línea", start_row, start_col)
+                self.add_error("Cadena sin cerrar antes del fin de línea", start_row, start_col)
                 return
             contenido += self.advance()
         
         if self.pos >= len(self.source):
-            self.errors.append("Cadena sin cerrar (EOF)")
+            self.add_error("Cadena sin cerrar (EOF)")
             return
         
         self.advance() 
@@ -349,11 +363,11 @@ class Lexer:
             return
         
         if ch == '!':
-            self.errors.append(f"Operador inválido: '!' (¿quisiste decir '!='?)")
+            self.add_error(f"Operador inválido: '!' (¿quisiste decir '!='?)")
             self.advance()
             return
         
-        self.errors.append(f"Operador no reconocido: '{ch}'")
+        self.add_error(f"Operador no reconocido: '{ch}'")
         self.advance()
 
 
@@ -370,11 +384,13 @@ def main():
     lexer = Lexer(source)
     tokens = lexer.tokenize()
 
-    print("Errores encontrados:")
-    for err in lexer.errors:
-        print(f"  {err}")
-
-    print("Análisis léxico exitoso.")
+    if lexer.errors:
+        print("\n\033[91mErrores encontrados:\033[0m")
+        for err in lexer.errors:
+            print(f"  {err}\n")
+    else:
+        print("\n\033[92mAnálisis léxico exitoso.\033[0m")
+    
     for tok in tokens:
         print(tok)
 
